@@ -1,0 +1,181 @@
+// Synopsis : Template for Deployment of Purview with Account & Portal PLE
+//
+// Prerequisite : 
+//  1)Virtual network Deployed with PLE pattern
+//  2)Private DNS Zone deployed for PLE "privatelink.purview.azure.com" with autoregistration enabled
+//
+// Assumption :
+//  1)Private DNS Zone deployed in Subscription : AABNL AZ Management(b658ffad-30c7-4be6-881c-e3dc1f6520af),RG : privatelinkdnszones01-p-rg
+//
+// Remark : Testing of this ARM template is pending
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "Account_name_prefix": {
+            "defaultValue": "prvw",
+            "type": "String"
+        },
+        "Environment": {
+            "defaultValue": "Development",
+            "type": "string",
+            "allowedValues": [ "Development", "Test", "Acceptance", "Production" ]
+        },
+        "PublicNetworkAccess": {
+            "type": "string",
+            "allowedValues": [ "Disabled", "Enabled" ],
+            "defaultValue": "Disabled"
+        },
+        "Capacity": {
+            "type": "int",
+            "allowedValues": [ 1, 4, 8 ],
+            "defaultValue": 1
+        },
+        "Virtual_Network": {
+            "type": "string"
+        },
+        "Subnet": {
+            "type": "string"
+        },
+        "Virtual_Network_RG": {
+            "type": "string"
+        },
+        "privateDNS": {
+            "type": "string"
+        },
+        "Tag": {
+            "type": "object"
+        }
+    },
+    "variables": {
+        "Purview_account_name": "[concat(parameters('Account_name_prefix'),'-',substring(toLower(parameters('Environment')), 0, 1))]",
+        "Purview_account_ple_name": "[concat(variables('Purview_account_name'),'-account','-ple')]",
+        "Purview_portal_ple_name": "[concat(variables('Purview_account_name'),'-portal','-ple')]"
+    },
+    "resources": [
+        {
+            "type": "Microsoft.Purview/accounts",
+            "apiVersion": "2021-07-01",
+            "name": "[variables('Purview_account_name')]",
+            "location": "[resourceGroup().location]",
+            "tags": "[parameters('Tag')]",
+            "sku": {
+                "name": "Standard",
+                "capacity": "[parameters('Capacity')]"
+            },
+            "identity": {
+                "type": "SystemAssigned"
+            },
+            "properties": {
+                "cloudConnectors": {
+                },
+                "publicNetworkAccess": "[parameters('PublicNetworkAccess')]",
+                "managedResourceGroupName": "[concat('managed-rg-',variables('Purview_account_name'))]"
+            }
+        },
+        {
+            "type": "Microsoft.Network/privateEndpoints",
+            "apiVersion": "2020-03-01",
+            "name": "[variables('Purview_account_ple_name')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+
+            },
+            "properties": {
+                "subnet": {
+                    "id": "[resourceId(parameters('Virtual_Network_RG'),'Microsoft.Network/virtualNetworks/subnets',parameters('Virtual_Network'),parameters('Subnet'))]"
+                },
+                "privateLinkServiceConnectionState": {
+                    "status": "Approved",
+                    "description": "Auto-Approved",
+                    "actionsRequired": "None"
+                },
+                "privateLinkServiceConnections": [
+                    {
+                        "name": "[variables('Purview_account_ple_name')]",
+                        "properties": {
+                            "privateLinkServiceId": "[resourceId('Microsoft.Purview/accounts',variables('Purview_account_name'))]",
+                            "groupIds": [ "account" ]
+                        }
+                    }
+                ]
+
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Purview/accounts', variables('Purview_account_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+            "apiVersion": "2020-03-01",
+            "name": "[concat(variables('Purview_account_ple_name'), '/', 'default')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "privateDnsZoneConfigs": [
+                    {
+                        "name": "[parameters('privateDNS')]",
+                        "properties": {
+                            "privateDnsZoneId": "[resourceId('b658ffad-30c7-4be6-881c-e3dc1f6520af','privatelinkdnszones01-p-rg','Microsoft.Network/privateDnsZones',parameters('privateDNS'))]"
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateEndpoints', variables('Purview_account_ple_name'))]",
+                "[resourceId('Microsoft.Purview/accounts', variables('Purview_account_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/privateEndpoints",
+            "apiVersion": "2020-03-01",
+            "name": "[variables('Purview_portal_ple_name')]",
+            "location": "[resourceGroup().location]",
+            "tags": {
+
+            },
+            "properties": {
+                "subnet": {
+                    "id": "[resourceId(parameters('Virtual_Network_RG'),'Microsoft.Network/virtualNetworks/subnets',parameters('Virtual_Network'),parameters('Subnet'))]"
+                },
+                "privateLinkServiceConnectionState": {
+                    "status": "Approved",
+                    "description": "Auto-Approved",
+                    "actionsRequired": "None"
+                },
+                "privateLinkServiceConnections": [
+                    {
+                        "name": "[variables('Purview_portal_ple_name')]",
+                        "properties": {
+                            "privateLinkServiceId": "[resourceId('Microsoft.Purview/accounts',variables('Purview_account_name'))]",
+                            "groupIds": [ "portal" ]
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Purview/accounts', variables('Purview_account_name'))]"
+            ]
+        },
+        {
+            "type": "Microsoft.Network/privateEndpoints/privateDnsZoneGroups",
+            "apiVersion": "2020-03-01",
+            "name": "[concat(variables('Purview_portal_ple_name'), '/', 'default')]",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "privateDnsZoneConfigs": [
+                    {
+                        "name": "[parameters('privateDNS')]",
+                        "properties": {
+                            "privateDnsZoneId": "[resourceId('b658ffad-30c7-4be6-881c-e3dc1f6520af','privatelinkdnszones01-p-rg','Microsoft.Network/privateDnsZones',parameters('privateDNS'))]"
+                        }
+                    }
+                ]
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/privateEndpoints', variables('Purview_portal_ple_name'))]",
+                "[resourceId('Microsoft.Purview/accounts', variables('Purview_account_name'))]"
+            ]
+        }
+
+    ]
+}
