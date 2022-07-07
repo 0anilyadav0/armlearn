@@ -1,0 +1,39 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "Account_name_prefix": {
+            "value": "purview"
+        },
+        "Environment": {
+            "value": "Development"
+        },
+        "PublicNetworkAccess": {
+            "value": "Enabled"
+        },
+        "Capacity": {
+            "value": 4
+        },
+        "Tag": {
+            "value": {
+                "Billing code": "NL0xxxx",
+                "ContactMail": "xxxxxxx@nl.abnamro.com",
+                "ContactPhone": "+31xxxxxx",
+                "Environment": "Development",
+                "Provider": "CBSP Azure"
+            }
+        },
+        "Virtual_Network": {
+            "value": "purview01-d-vnet"
+        },
+        "Subnet": {
+            "value": "ple01-subnet" 
+        },
+        "Virtual_Network_RG": {
+            "value": "purview01-vnets-d-rg"
+        },
+        "privateDNS": {
+            "value": "privatelink.purview.azure.com"
+        }
+    }
+}
